@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import random
 import shutil
 import subprocess
 import sys
@@ -11,6 +12,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
+
+DEFAULT_SIZES = [32, 64, 96, 128, 192, 256]
+DEFAULT_SEED = 20261014
 
 ABSOLUTE_TOLERANCE = 1e-12
 RELATIVE_TOLERANCE = 1e-12
@@ -263,16 +267,97 @@ def compare_program_outputs(c_executable: Path) -> None:
     print("All implementations produced the expected matrix.")
     print("Python, Java and C results match.")
 
+def create_matrix(n: int, generator: random.Random) -> list[list[float]]:
+    """Create an n-by-n matrix with values between -8 and 8."""
+    return [
+        [float(generator.randint(-8, 8)) for _ in range(n)]
+        for _ in range(n)
+    ]
+
+
+def write_matrix(output, matrix: list[list[float]]) -> None:
+    """Write one matrix as whitespace-separated rows."""
+    for row in matrix:
+        output.write(
+            " ".join(str(int(value)) for value in row)
+            + "\n"
+        )
+
+
+def generate_dataset(
+    output_path: Path,
+    n: int,
+    seed: int,
+) -> None:
+    """Generate and save two deterministic matrices for one size."""
+    generator = random.Random(seed)
+
+    matrix_a = create_matrix(n, generator)
+    matrix_b = create_matrix(n, generator)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with output_path.open(
+        "w",
+        encoding="ascii",
+        newline="\n",
+    ) as output:
+        output.write(f"{n}\n")
+        write_matrix(output, matrix_a)
+        write_matrix(output, matrix_b)
+
+    print(f"Generated dataset: {output_path}")
+
+
+def generate_datasets(
+    sizes: list[int],
+    seed: int,
+) -> list[Path]:
+    """Generate one shared dataset for every requested matrix size."""
+    data_directory = ROOT / "data"
+    dataset_paths = []
+
+    for n in sizes:
+        dataset_path = data_directory / f"n_{n}.txt"
+        generate_dataset(dataset_path, n, seed)
+        dataset_paths.append(dataset_path)
+
+    return dataset_paths
+
 
 def main() -> None:
-    """Run self-tests and compare the three implementations."""
+    """Generate shared datasets and run correctness checks."""
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=DEFAULT_SEED,
+        help="Seed used to generate the shared datasets.",
+    )
+    parser.add_argument(
+        "--sizes",
+        type=int,
+        nargs="+",
+        default=DEFAULT_SIZES,
+        help="Matrix sizes to generate.",
+    )
+    args = parser.parse_args()
+
+    if any(size < 2 for size in args.sizes):
+        parser.error("all matrix sizes must be at least 2")
+
     compile_java_if_needed()
     c_executable = find_c_executable()
+
+    generate_datasets(args.sizes, args.seed)
 
     run_self_tests(c_executable)
     compare_program_outputs(c_executable)
 
     print("All correctness checks passed.")
+    print("Datasets are ready for the benchmark.")
 
 
 if __name__ == "__main__":
