@@ -1,6 +1,10 @@
+"""Validate and benchmark matrix multiplication in Python, Java and C."""
+
 from __future__ import annotations
 
 import argparse
+import csv
+import json
 import math
 import random
 import shutil
@@ -14,6 +18,21 @@ ROOT = Path(__file__).resolve().parent
 
 DEFAULT_SIZES = [32, 64, 96, 128, 192, 256]
 DEFAULT_SEED = 20261014
+DEFAULT_REPETITIONS = 5
+
+BATCHES = {
+    32: 16,
+    64: 4,
+    96: 2,
+}
+
+WARMUPS = {
+    "Python": 1,
+    "Java": 20,
+    "C": 1,
+}
+
+LANGUAGES = ("Python", "Java", "C")
 
 ABSOLUTE_TOLERANCE = 1e-12
 RELATIVE_TOLERANCE = 1e-12
@@ -60,7 +79,7 @@ def find_c_executable() -> Path:
 
 
 def compile_java_if_needed() -> None:
-    """Compile the Java implementation if its class file is missing."""
+    """Compile Java if its class file is missing."""
     if shutil.which("javac") is None:
         raise RuntimeError(
             "javac was not found. Open a terminal with a JDK available."
@@ -78,7 +97,7 @@ def compile_java_if_needed() -> None:
 
 
 def run_self_tests(c_executable: Path) -> None:
-    """Run built-in correctness tests in all implementations."""
+    """Run the built-in tests in Python, Java and C."""
     run_command(
         [sys.executable, "matrix_multiply.py", "--self-test"],
         "Python self-test",
@@ -96,7 +115,7 @@ def run_self_tests(c_executable: Path) -> None:
 
 
 def write_dataset(path: Path) -> None:
-    """Write one small deterministic dataset for comparison."""
+    """Write the small known-answer comparison dataset."""
     path.write_text(
         "\n".join(
             [
@@ -174,7 +193,7 @@ def compare_matrices(
 
 
 def compare_program_outputs(c_executable: Path) -> None:
-    """Run all implementations with the same small input."""
+    """Run Python, Java and C with the same small input."""
     expected = [
         [19.0, 22.0],
         [43.0, 50.0],
@@ -280,7 +299,7 @@ def create_matrix(
     n: int,
     generator: random.Random,
 ) -> list[list[float]]:
-    """Create an n-by-n matrix with values between -8 and 8."""
+    """Create an n-by-n matrix with values from -8 to 8."""
     return [
         [
             float(generator.randint(-8, 8))
@@ -290,10 +309,7 @@ def create_matrix(
     ]
 
 
-def write_matrix(
-    output,
-    matrix: list[list[float]],
-) -> None:
+def write_matrix(output, matrix: list[list[float]]) -> None:
     """Write one matrix as whitespace-separated rows."""
     for row in matrix:
         output.write(
@@ -334,7 +350,7 @@ def generate_datasets(
     sizes: list[int],
     seed: int,
 ) -> list[Path]:
-    """Generate one shared dataset for every matrix size."""
+    """Generate one shared dataset for each matrix size."""
     data_directory = ROOT / "data"
     dataset_paths = []
 
@@ -355,7 +371,7 @@ def generate_datasets(
 def read_dataset(
     path: Path,
 ) -> tuple[int, list[list[float]], list[list[float]]]:
-    """Read the size and two matrices from a dataset file."""
+    """Read the size and two matrices from a dataset."""
     values = [
         float(token)
         for token in path.read_text(
@@ -402,7 +418,7 @@ def reference_multiply(
     matrix_a: list[list[float]],
     matrix_b: list[list[float]],
 ) -> list[list[float]]:
-    """Calculate the reference matrix product in Python."""
+    """Calculate a reference matrix product in Python."""
     n = len(matrix_a)
 
     result = [
@@ -427,7 +443,7 @@ def validate_result_file(
     expected: list[list[float]],
     label: str,
 ) -> None:
-    """Validate every value written by one implementation."""
+    """Validate every value written by an implementation."""
     n = len(expected)
     actual = read_matrix(path, n)
 
@@ -438,47 +454,70 @@ def validate_result_file(
     )
 
 
-def run_dataset_program(
+def build_program_command(
     language: str,
     input_path: Path,
     output_path: Path,
     c_executable: Path,
-) -> None:
-    """Run one implementation with a generated dataset."""
+    warmups: int,
+    repetitions: int,
+    batch: int,
+) -> list[str]:
+    """Build the command used to run one implementation."""
     arguments = [
         "--input",
         str(input_path),
         "--output",
         str(output_path),
         "--warmups",
-        "0",
+        str(warmups),
         "--repetitions",
-        "1",
+        str(repetitions),
         "--batch",
-        "1",
+        str(batch),
     ]
 
     if language == "Python":
-        command = [
+        return [
             sys.executable,
             "matrix_multiply.py",
             *arguments,
         ]
-    elif language == "Java":
-        command = [
+
+    if language == "Java":
+        return [
             "java",
             "MatrixMultiply",
             *arguments,
         ]
-    elif language == "C":
-        command = [
+
+    if language == "C":
+        return [
             str(c_executable),
             *arguments,
         ]
-    else:
-        raise ValueError(
-            f"unknown language: {language}"
-        )
+
+    raise ValueError(
+        f"unknown language: {language}"
+    )
+
+
+def run_dataset_program(
+    language: str,
+    input_path: Path,
+    output_path: Path,
+    c_executable: Path,
+) -> None:
+    """Run one implementation for correctness validation."""
+    command = build_program_command(
+        language=language,
+        input_path=input_path,
+        output_path=output_path,
+        c_executable=c_executable,
+        warmups=0,
+        repetitions=1,
+        batch=1,
+    )
 
     run_command(
         command,
@@ -521,7 +560,7 @@ def compare_generated_datasets(
                 matrix_b,
             )
 
-            for language in ("Python", "Java", "C"):
+            for language in LANGUAGES:
                 output_path = (
                     temporary_directory
                     / f"{language.lower()}_{n}.txt"
@@ -546,8 +585,205 @@ def compare_generated_datasets(
             )
 
 
+def run_timed_program(
+    language: str,
+    input_path: Path,
+    output_path: Path,
+    c_executable: Path,
+    repetitions: int,
+) -> dict[str, object]:
+    """Run one implementation and return its timing information."""
+    warmups = WARMUPS[language]
+    batch = BATCHES.get(
+        int(input_path.stem.split("_")[1]),
+        1,
+    )
+
+    command = build_program_command(
+        language=language,
+        input_path=input_path,
+        output_path=output_path,
+        c_executable=c_executable,
+        warmups=warmups,
+        repetitions=repetitions,
+        batch=batch,
+    )
+
+    print(
+        f"Benchmarking {language}, "
+        f"n={input_path.stem.split('_')[1]}, "
+        f"batch={batch}..."
+    )
+
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    output_lines = completed.stdout.strip().splitlines()
+
+    if not output_lines:
+        raise RuntimeError(
+            f"{language}: program produced no JSON output"
+        )
+
+    try:
+        payload = json.loads(output_lines[-1])
+    except json.JSONDecodeError as error:
+        raise RuntimeError(
+            f"{language}: could not parse timing output:\n"
+            f"{completed.stdout}"
+        ) from error
+
+    times = [
+        float(value)
+        for value in payload["times_seconds"]
+    ]
+
+    if len(times) != repetitions:
+        raise ValueError(
+            f"{language}: expected {repetitions} timing samples, "
+            f"received {len(times)}"
+        )
+
+    if any(value <= 0 for value in times):
+        raise ValueError(
+            f"{language}: timing samples must be positive"
+        )
+
+    return {
+        "times_seconds": times,
+        "checksum": float(payload["checksum"]),
+        "batch": int(payload["batch"]),
+    }
+
+
+def write_results_csv(
+    rows: list[dict[str, str]],
+) -> Path:
+    """Write raw timing samples to results.csv."""
+    output_path = ROOT / "results.csv"
+
+    fieldnames = [
+        "language",
+        "n",
+        "sample_index",
+        "batch_products",
+        "time_seconds",
+        "result_checksum",
+        "status",
+    ]
+
+    with output_path.open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as output:
+        writer = csv.DictWriter(
+            output,
+            fieldnames=fieldnames,
+        )
+
+        writer.writeheader()
+        writer.writerows(rows)
+
+    return output_path
+
+
+def benchmark_all_datasets(
+    sizes: list[int],
+    c_executable: Path,
+    repetitions: int,
+) -> None:
+    """Benchmark every language and size and save raw measurements."""
+    data_directory = ROOT / "data"
+    rows: list[dict[str, str]] = []
+
+    with tempfile.TemporaryDirectory() as temporary_name:
+        temporary_directory = Path(temporary_name)
+
+        for n in sizes:
+            input_path = data_directory / f"n_{n}.txt"
+
+            dataset_n, matrix_a, matrix_b = read_dataset(
+                input_path
+            )
+
+            if dataset_n != n:
+                raise ValueError(
+                    f"{input_path}: expected size {n}, "
+                    f"found {dataset_n}"
+                )
+
+            expected = reference_multiply(
+                matrix_a,
+                matrix_b,
+            )
+
+            for language in LANGUAGES:
+                output_path = (
+                    temporary_directory
+                    / f"{language.lower()}_timed_{n}.txt"
+                )
+
+                payload = run_timed_program(
+                    language=language,
+                    input_path=input_path,
+                    output_path=output_path,
+                    c_executable=c_executable,
+                    repetitions=repetitions,
+                )
+
+                validate_result_file(
+                    output_path,
+                    expected,
+                    f"{language} timed result for n={n}",
+                )
+
+                times = payload["times_seconds"]
+                checksum = float(payload["checksum"])
+                batch = int(payload["batch"])
+
+                for index, value in enumerate(times, start=1):
+                    rows.append(
+                        {
+                            "language": language,
+                            "n": str(n),
+                            "sample_index": str(index),
+                            "batch_products": str(batch),
+                            "time_seconds": format(
+                                float(value),
+                                ".17g",
+                            ),
+                            "result_checksum": format(
+                                checksum,
+                                ".17g",
+                            ),
+                            "status": "ok",
+                        }
+                    )
+
+    rows.sort(
+        key=lambda row: (
+            int(row["n"]),
+            LANGUAGES.index(row["language"]),
+            int(row["sample_index"]),
+        )
+    )
+
+    results_path = write_results_csv(rows)
+
+    print(f"Raw timing results written to: {results_path}")
+    print(f"Recorded {len(rows)} timing samples.")
+
+
 def main() -> None:
-    """Generate datasets and validate all implementations."""
+    """Generate datasets, validate results and measure execution time."""
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -562,7 +798,14 @@ def main() -> None:
         type=int,
         nargs="+",
         default=DEFAULT_SIZES,
-        help="Matrix sizes to generate and validate.",
+        help="Matrix sizes to generate and benchmark.",
+    )
+
+    parser.add_argument(
+        "--repetitions",
+        type=int,
+        default=DEFAULT_REPETITIONS,
+        help="Measured repetitions per language and size.",
     )
 
     args = parser.parse_args()
@@ -570,6 +813,11 @@ def main() -> None:
     if any(size < 2 for size in args.sizes):
         parser.error(
             "all matrix sizes must be at least 2"
+        )
+
+    if args.repetitions < 5:
+        parser.error(
+            "at least five repetitions are required"
         )
 
     compile_java_if_needed()
@@ -590,11 +838,14 @@ def main() -> None:
         c_executable,
     )
 
-    print("All correctness checks passed.")
-    print(
-        "All generated datasets passed "
-        "cross-language validation."
+    benchmark_all_datasets(
+        sizes=args.sizes,
+        c_executable=c_executable,
+        repetitions=args.repetitions,
     )
+
+    print("All correctness checks passed.")
+    print("Benchmark completed successfully.")
 
 
 if __name__ == "__main__":
