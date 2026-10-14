@@ -1,0 +1,52 @@
+{
+  "run_timestamp": "2026-10-15T00:54:35+01:00",
+  "operating_system": "Windows 10 10.0.19045 AMD64",
+  "python_version": "3.12.7 (tags/v3.12.7:0b05ead, Oct  1 2024, 03:06:41) [MSC v.1941 64 bit (AMD64)]",
+  "java_runtime_version": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+  "java_compiler_version": "javac 21.0.12.1",
+  "c_executable": "C:\\Users\\Javier Guerra\\Individual-Assigments-1\\matrix_multiply.exe",
+  "c_compiler_flags": [
+    "/nologo",
+    "/Od",
+    "/W4",
+    "/std:c11"
+  ],
+  "seed": 20261014,
+  "sizes": [
+    32,
+    64,
+    96,
+    128,
+    192,
+    256
+  ],
+  "repetitions": 5,
+  "warmups": {
+    "Python": 1,
+    "Java": 20,
+    "C": 1
+  },
+  "batch_products_per_sample": {
+    "32": 16,
+    "64": 4,
+    "96": 2,
+    "128": 1,
+    "192": 1,
+    "256": 1
+  },
+  "time_budget_seconds": 60.0,
+  "memory_budget_mib": 2048,
+  "memory_metric": "peak_process_working_set_bytes",
+  "timing_boundary": "multiplication loops only; loading, allocation, output and validation are outside the timed region",
+  "threads": {
+    "application_multiplication_threads": 1,
+    "numerical_library_threads": 0,
+    "affinity": "OS scheduler default; no affinity pinning"
+  },
+  "hardware": {
+    "processor": "AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD",
+    "machine": "AMD64",
+    "logical_processors": 16,
+    "total_memory_gib": 15.920642852783203
+  }
+}
