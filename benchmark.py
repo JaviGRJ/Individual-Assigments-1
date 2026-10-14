@@ -1,5 +1,3 @@
-"""Validate and benchmark matrix multiplication in Python, Java and C."""
-
 from __future__ import annotations
 
 import argparse
@@ -12,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from statistics import median
 
 
 ROOT = Path(__file__).resolve().parent
@@ -309,7 +308,10 @@ def create_matrix(
     ]
 
 
-def write_matrix(output, matrix: list[list[float]]) -> None:
+def write_matrix(
+    output,
+    matrix: list[list[float]],
+) -> None:
     """Write one matrix as whitespace-separated rows."""
     for row in matrix:
         output.write(
@@ -593,11 +595,9 @@ def run_timed_program(
     repetitions: int,
 ) -> dict[str, object]:
     """Run one implementation and return its timing information."""
+    n = int(input_path.stem.split("_")[1])
     warmups = WARMUPS[language]
-    batch = BATCHES.get(
-        int(input_path.stem.split("_")[1]),
-        1,
-    )
+    batch = BATCHES.get(n, 1)
 
     command = build_program_command(
         language=language,
@@ -611,7 +611,7 @@ def run_timed_program(
 
     print(
         f"Benchmarking {language}, "
-        f"n={input_path.stem.split('_')[1]}, "
+        f"n={n}, "
         f"batch={batch}..."
     )
 
@@ -699,8 +699,8 @@ def benchmark_all_datasets(
     sizes: list[int],
     c_executable: Path,
     repetitions: int,
-) -> None:
-    """Benchmark every language and size and save raw measurements."""
+) -> list[dict[str, str]]:
+    """Benchmark every language and size."""
     data_directory = ROOT / "data"
     rows: list[dict[str, str]] = []
 
@@ -778,12 +778,228 @@ def benchmark_all_datasets(
 
     results_path = write_results_csv(rows)
 
-    print(f"Raw timing results written to: {results_path}")
-    print(f"Recorded {len(rows)} timing samples.")
+    print(
+        f"Raw timing results written to: "
+        f"{results_path}"
+    )
+    print(
+        f"Recorded {len(rows)} timing samples."
+    )
+
+    return rows
+
+
+def percentile(
+    values: list[float],
+    fraction: float,
+) -> float:
+    """Calculate a linearly interpolated percentile."""
+    if not values:
+        raise ValueError(
+            "cannot calculate a percentile from no values"
+        )
+
+    if not 0.0 <= fraction <= 1.0:
+        raise ValueError(
+            "percentile fraction must be between 0 and 1"
+        )
+
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * fraction
+
+    lower_index = math.floor(position)
+    upper_index = math.ceil(position)
+
+    lower_value = ordered[lower_index]
+    upper_value = ordered[upper_index]
+
+    weight = position - lower_index
+
+    return lower_value + (
+        upper_value - lower_value
+    ) * weight
+
+
+def calculate_iqr(
+    values: list[float],
+) -> float:
+    """Calculate the interquartile range."""
+    first_quartile = percentile(
+        values,
+        0.25,
+    )
+
+    third_quartile = percentile(
+        values,
+        0.75,
+    )
+
+    return third_quartile - first_quartile
+
+
+def write_summary_csv(
+    rows: list[dict[str, str]],
+) -> Path:
+    """Write median and IQR statistics to summary.csv."""
+    grouped: dict[tuple[str, int], list[float]] = {}
+
+    for row in rows:
+        if row["status"] != "ok":
+            continue
+
+        key = (
+            row["language"],
+            int(row["n"]),
+        )
+
+        grouped.setdefault(
+            key,
+            [],
+        ).append(
+            float(row["time_seconds"])
+        )
+
+    sizes = sorted(
+        {
+            int(row["n"])
+            for row in rows
+        }
+    )
+
+    summary_rows: list[dict[str, str]] = []
+
+    for n in sizes:
+        for language in LANGUAGES:
+            values = grouped.get(
+                (language, n),
+                [],
+            )
+
+            if not values:
+                summary_rows.append(
+                    {
+                        "language": language,
+                        "n": str(n),
+                        "samples": "0",
+                        "median_seconds": "",
+                        "median_milliseconds": "",
+                        "iqr_seconds": "",
+                        "iqr_milliseconds": "",
+                        "status": "no successful samples",
+                    }
+                )
+                continue
+
+            median_seconds = median(values)
+            iqr_seconds = calculate_iqr(values)
+
+            summary_rows.append(
+                {
+                    "language": language,
+                    "n": str(n),
+                    "samples": str(len(values)),
+                    "median_seconds": format(
+                        median_seconds,
+                        ".17g",
+                    ),
+                    "median_milliseconds": format(
+                        median_seconds * 1000.0,
+                        ".17g",
+                    ),
+                    "iqr_seconds": format(
+                        iqr_seconds,
+                        ".17g",
+                    ),
+                    "iqr_milliseconds": format(
+                        iqr_seconds * 1000.0,
+                        ".17g",
+                    ),
+                    "status": "ok",
+                }
+            )
+
+    summary_path = ROOT / "summary.csv"
+
+    fieldnames = [
+        "language",
+        "n",
+        "samples",
+        "median_seconds",
+        "median_milliseconds",
+        "iqr_seconds",
+        "iqr_milliseconds",
+        "status",
+    ]
+
+    with summary_path.open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as output:
+        writer = csv.DictWriter(
+            output,
+            fieldnames=fieldnames,
+        )
+
+        writer.writeheader()
+        writer.writerows(summary_rows)
+
+    return summary_path
+
+
+def print_summary(
+    summary_path: Path,
+) -> None:
+    """Print summary statistics to the console."""
+    print(
+        f"Summary written to: "
+        f"{summary_path}"
+    )
+    print()
+    print(
+        "Language  n      Median (ms)      IQR (ms)      Samples"
+    )
+    print(
+        "--------  -----  ---------------  ------------  -------"
+    )
+
+    with summary_path.open(
+        "r",
+        encoding="utf-8",
+        newline="",
+    ) as input_file:
+        reader = csv.DictReader(input_file)
+
+        for row in reader:
+            if row["status"] != "ok":
+                print(
+                    f"{row['language']:8} "
+                    f"{row['n']:5} "
+                    f"{'no data':15} "
+                    f"{'no data':12} "
+                    f"{row['samples']:7}"
+                )
+                continue
+
+            median_text = (
+                f"{float(row['median_milliseconds']):.4f}"
+            )
+
+            iqr_text = (
+                f"{float(row['iqr_milliseconds']):.4f}"
+            )
+
+            print(
+                f"{row['language']:8} "
+                f"{row['n']:5} "
+                f"{median_text:15} "
+                f"{iqr_text:12} "
+                f"{row['samples']:7}"
+            )
 
 
 def main() -> None:
-    """Generate datasets, validate results and measure execution time."""
+    """Generate datasets, validate and benchmark."""
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -838,11 +1054,14 @@ def main() -> None:
         c_executable,
     )
 
-    benchmark_all_datasets(
+    rows = benchmark_all_datasets(
         sizes=args.sizes,
         c_executable=c_executable,
         repetitions=args.repetitions,
     )
+
+    summary_path = write_summary_csv(rows)
+    print_summary(summary_path)
 
     print("All correctness checks passed.")
     print("Benchmark completed successfully.")
