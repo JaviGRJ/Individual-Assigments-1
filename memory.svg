@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">
+<rect width="100%" height="100%" fill="white"/>
+<text x="450.0" y="34" text-anchor="middle" font-family="Arial, sans-serif" font-size="20">Peak process working set</text>
+<path d="M 94 82 V 478 H 866" fill="none" stroke="#333333"/>
+<text x="450.0" y="538" text-anchor="middle" font-family="Arial, sans-serif" font-size="14">Matrix side length n</text>
+<text x="24" y="280.0" text-anchor="middle" transform="rotate(-90 24 280.0)" font-family="Arial, sans-serif" font-size="14">Peak working set in MiB</text>
+<path d="M 90 82.0 H 866" stroke="#dddddd"/>
+<text x="84" y="86.0" text-anchor="end" font-family="Arial, sans-serif" font-size="11">73.5 MiB</text>
+<path d="M 90 181.0 H 866" stroke="#dddddd"/>
+<text x="84" y="185.0" text-anchor="end" font-family="Arial, sans-serif" font-size="11">56 MiB</text>
+<path d="M 90 280.0 H 866" stroke="#dddddd"/>
+<text x="84" y="284.0" text-anchor="end" font-family="Arial, sans-serif" font-size="11">38.6 MiB</text>
+<path d="M 90 379.0 H 866" stroke="#dddddd"/>
+<text x="84" y="383.0" text-anchor="end" font-family="Arial, sans-serif" font-size="11">21.1 MiB</text>
+<path d="M 90 478.0 H 866" stroke="#dddddd"/>
+<text x="84" y="482.0" text-anchor="end" font-family="Arial, sans-serif" font-size="11">3.58 MiB</text>
+<path d="M 94.0 478 v 4" stroke="#333333"/>
+<text x="94.0" y="499" text-anchor="middle" font-family="Arial, sans-serif" font-size="11">32</text>
+<path d="M 204.3 478 v 4" stroke="#333333"/>
+<text x="204.3" y="499" text-anchor="middle" font-family="Arial, sans-serif" font-size="11">64</text>
+<path d="M 314.6 478 v 4" stroke="#333333"/>
+<text x="314.6" y="499" text-anchor="middle" font-family="Arial, sans-serif" font-size="11">96</text>
+<path d="M 424.9 478 v 4" stroke="#333333"/>
+<text x="424.9" y="499" text-anchor="middle" font-family="Arial, sans-serif" font-size="11">128</text>
+<path d="M 645.4 478 v 4" stroke="#333333"/>
+<text x="645.4" y="499" text-anchor="middle" font-family="Arial, sans-serif" font-size="11">192</text>
+<path d="M 866.0 478 v 4" stroke="#333333"/>
+<text x="866.0" y="499" text-anchor="middle" font-family="Arial, sans-serif" font-size="11">256</text>
+<polyline points="94.0,423.1 204.3,421.6 314.6,415.8 424.9,409.4 645.4,388.0 866.0,365.6" fill="none" stroke="#2b6cb0" stroke-width="2.5"/>
+<circle cx="94.0" cy="423.1" r="4" fill="#2b6cb0"/>
+<circle cx="204.3" cy="421.6" r="4" fill="#2b6cb0"/>
+<circle cx="314.6" cy="415.8" r="4" fill="#2b6cb0"/>
+<circle cx="424.9" cy="409.4" r="4" fill="#2b6cb0"/>
+<circle cx="645.4" cy="388.0" r="4" fill="#2b6cb0"/>
+<circle cx="866.0" cy="365.6" r="4" fill="#2b6cb0"/>
+<path d="M 94 59 h 25" stroke="#2b6cb0" stroke-width="3"/>
+<text x="126" y="64" font-family="Arial, sans-serif" font-size="13">Python</text>
+<polyline points="94.0,261.6 204.3,240.8 314.6,197.4 424.9,183.6 645.4,130.6 866.0,82.0" fill="none" stroke="#c05621" stroke-width="2.5"/>
+<circle cx="94.0" cy="261.6" r="4" fill="#c05621"/>
+<circle cx="204.3" cy="240.8" r="4" fill="#c05621"/>
+<circle cx="314.6" cy="197.4" r="4" fill="#c05621"/>
+<circle cx="424.9" cy="183.6" r="4" fill="#c05621"/>
+<circle cx="645.4" cy="130.6" r="4" fill="#c05621"/>
+<circle cx="866.0" cy="82.0" r="4" fill="#c05621"/>
+<path d="M 264 59 h 25" stroke="#c05621" stroke-width="3"/>
+<text x="296" y="64" font-family="Arial, sans-serif" font-size="13">Java</text>
+<polyline points="94.0,477.8 204.3,478.0 314.6,478.0 424.9,478.0 645.4,475.6 866.0,471.8" fill="none" stroke="#2f855a" stroke-width="2.5"/>
+<circle cx="94.0" cy="477.8" r="4" fill="#2f855a"/>
+<circle cx="204.3" cy="478.0" r="4" fill="#2f855a"/>
+<circle cx="314.6" cy="478.0" r="4" fill="#2f855a"/>
+<circle cx="424.9" cy="478.0" r="4" fill="#2f855a"/>
+<circle cx="645.4" cy="475.6" r="4" fill="#2f855a"/>
+<circle cx="866.0" cy="471.8" r="4" fill="#2f855a"/>
+<path d="M 434 59 h 25" stroke="#2f855a" stroke-width="3"/>
+<text x="466" y="64" font-family="Arial, sans-serif" font-size="13">C</text>
+</svg>
